@@ -30,7 +30,7 @@ No test runner is configured.
 
 ### Architecture
 
-The entire app lives in `src/MissionControl.jsx` (~1125 lines). `src/main.jsx` mounts it as the root component — `src/App.jsx` is unused Vite scaffold.
+The entire app lives in `src/MissionControl.jsx` (~1143 lines). `src/main.jsx` mounts it as the root component — `src/App.jsx` is unused Vite scaffold.
 
 **How it works:** The app calls the Anthropic API directly from the browser (`https://api.anthropic.com/v1/messages`) — there is no backend. `callClaude` sends **no `x-api-key` header**; auth is handled by the browser's claude.ai session cookies, so the app only works when opened in a browser signed into claude.ai. It passes `mcp_servers` in the request body to have Claude orchestrate external services:
 
@@ -63,6 +63,19 @@ All Claude calls go through `callClaude(prompt, mcpServers?)`, which returns raw
 **Panel pattern:** Each service section is a `<Panel>` component with a `status` prop (`"ok"` / `"err"` / `"loading"` / `"idle"`) that drives the indicator dot color.
 
 **Hardcoded IDs** in `MissionControl.jsx` (top of file): Make.com team ID (`TEAM_ID`), Netlify site ID (`NETLIFY_ID`), and the two tracked Make.com scenario IDs in `SCENARIOS`.
+
+**Claude model:** All `callClaude` calls use `claude-sonnet-4-6`. `max_tokens` is 1000 for most calls, 4000 in Orion's CEO Runner scenario.
+
+**Startup timing:** The root `App` component delays MakePanel initialization by 3 seconds (`makeReady` state + `setTimeout`) to avoid hammering the Make MCP on first load.
+
+### orion-prime/
+
+Supporting files for the Orion Prime autonomous agent system (not runtime code — these are reference/config):
+
+- `ceo-runner-prompt.md` — Full system prompt pasted into the CEO Runner Make.com scenario
+- `watchdog-prompt.md` — System prompt for the Watchdog scenario
+- `state-schema.json` — Initial value for the `orion_state` key in Make data store ID 99050
+- `setup-guide.md` — Step-by-step checklist for first-time setup of all integrations (Make scenarios, Notion DBs, Stripe permissions, Slack)
 
 ---
 
