@@ -43,18 +43,19 @@ All Claude calls go through `callClaude(prompt, mcpServers?)`, which returns raw
 
 **Layout:** 3-column grid. Above the grid: `Briefing` bar.
 - Column 1: `MakePanel` + `OpenClawPanel`
-- Column 2: `OrionMemoryPanel` + `TasksPanel`
+- Column 2: `OrionMemoryPanel` + `TasksPanel` + `ActionLogPanel`
 - Column 3: `StripePanel` + `NetlifyPanel` + `ContentQueuePanel`
 
 **Panels:**
 - `MakePanel` — controls the two "Orion Prime" Make.com scenarios (activate/pause/run now) and lists connectors; uses `MCP_MAKE`
 - `OpenClawPanel` — connects to the local openclaw agent gateway at `http://localhost:18789` (constants `GW` + `GW_TOKEN` at top of panel section); shows online status and agent stats; lets you trigger hardcoded `CRON_JOBS` or send direct instructions to Orion via a chat input
 - `OrionMemoryPanel` — reads the `orion_state` key from Make data store ID 99050; this is the Orion Prime agent's persistent memory/status (green/yellow/red health, ops summary, agent tasks, last decision); uses `MCP_MAKE`
-- `TasksPanel` — reads priority tasks from a Notion Tasks DB; uses `MCP_NOTION`
+- `TasksPanel` — reads priority tasks from a Notion Tasks DB (hardcoded URL); uses `MCP_NOTION`
+- `ActionLogPanel` — reads the last 10 entries from the "Orion Action Log" Notion DB (found by title search); shows type, result, notes, and cycle timestamp; uses `MCP_NOTION`
 - `StripePanel` — shows account balance and last 5 payment intents; uses `MCP_STRIPE`
 - `NetlifyPanel` — shows current deploy status for site `NETLIFY_ID`; uses `MCP_NETLIFY`
 - `ContentQueuePanel` — reads Draft/Scheduled items from a Notion Content Queue DB; can trigger posting to X/WhatsApp/Slack; uses `MCP_NOTION`
-- `Briefing` — aggregates resolved data from all panels then generates a 3-sentence "Director's Briefing" via a direct `callClaude` call (no MCP servers); not auto-generated, triggered by button once all panels load
+- `Briefing` — aggregates resolved data from all panels then generates a 3-sentence "Director's Briefing" via a direct `callClaude` call (no MCP servers); **auto-generates** once all four data sources are ready (`makeReady` + `stripeData` + `netlifyData` + `orionData`); button shown afterward for manual refresh
 
 **"Orion Prime"** is the name of the autonomous agent system — two Make.com scenarios running every 4 hours (CEO Runner + Watchdog) with state persisted in a Make data store. This dashboard is the human operator's view of it.
 
