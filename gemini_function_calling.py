@@ -1,5 +1,6 @@
 import os
-import requests
+import asyncio
+import httpx
 from google import genai
 from google.genai import types
 
@@ -12,15 +13,15 @@ WMO_CODES = {
     75: "Heavy snow", 80: "Rain showers", 81: "Heavy rain showers", 95: "Thunderstorm",
 }
 
-def get_current_temperature(location: str) -> dict:
-    geo = requests.get(
+async def get_current_temperature(location: str, http: httpx.AsyncClient) -> dict:
+    geo = (await http.get(
         "https://geocoding-api.open-meteo.com/v1/search",
         params={"name": location, "count": 1},
-    ).json()
+    )).json()
     if not geo.get("results"):
         return {"error": f"Location '{location}' not found"}
     r = geo["results"][0]
-    weather = requests.get(
+    weather = (await http.get(
         "https://api.open-meteo.com/v1/forecast",
         params={
             "latitude": r["latitude"],
@@ -28,7 +29,9 @@ def get_current_temperature(location: str) -> dict:
             "current": "temperature_2m,weathercode",
             "temperature_unit": "fahrenheit",
         },
-    ).json()
+    )).json()
+    if "current" not in weather:
+        return {"error": f"Weather API error: {weather}"}
     current = weather["current"]
     return {
         "location": r["name"],
@@ -55,30 +58,39 @@ weather_function = {
 tools = types.Tool(function_declarations=[weather_function])
 config = types.GenerateContentConfig(tools=[tools])
 
-contents = ["What's the weather like in London, Tokyo, New York, Sydney, Paris, Dubai, Mumbai, São Paulo, Toronto, and Singapore right now?"]
 
-while True:
-    response = client.models.generate_content(
-        model="gemini-3.5-flash",
-        contents=contents,
-        config=config,
-    )
+async def main():
+    contents = ["What's the weather like in London, Tokyo, New York, Sydney, Paris, Dubai, Mumbai, São Paulo, Toronto, and Singapore right now?"]
 
-    candidate = response.candidates[0]
-    function_calls = [p for p in candidate.content.parts if p.function_call]
+    async with httpx.AsyncClient() as http:
+        while True:
+            response = await client.aio.models.generate_content(
+                model="gemini-3.5-flash",
+                contents=contents,
+                config=config,
+            )
 
-    if not function_calls:
-        print("Final Response:", response.text)
-        break
+            candidate = response.candidates[0]
+            function_calls = [p for p in candidate.content.parts if p.function_call]
 
-    contents.append(candidate.content)
+            if not function_calls:
+                print("Final Response:", response.text)
+                break
 
-    fn_response_parts = []
-    for part in function_calls:
-        fc = part.function_call
-        print(f"Calling {fc.name} with args {fc.args}")
-        result = get_current_temperature(**fc.args)
-        print(f"  -> {result}")
-        fn_response_parts.append(types.Part.from_function_response(name=fc.name, response=result))
+            contents.append(candidate.content)
 
-    contents.append(types.Content(role="user", parts=fn_response_parts))
+            results = await asyncio.gather(*[
+                get_current_temperature(p.function_call.args["location"], http)
+                for p in function_calls
+            ])
+
+            fn_response_parts = []
+            for part, result in zip(function_calls, results):
+                fc = part.function_call
+                print(f"Calling {fc.name}({fc.args['location']}) -> {result}")
+                fn_response_parts.append(types.Part.from_function_response(name=fc.name, response=result))
+
+            contents.append(types.Content(role="user", parts=fn_response_parts))
+
+
+asyncio.run(main())
